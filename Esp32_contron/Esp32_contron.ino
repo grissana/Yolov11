@@ -104,7 +104,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (msg == "on") {
       digitalWrite(LED_PIN, HIGH);
       LED1mcu2 = 1;
-      myServo.write(90);  // ✅ หมุน Servo ไปที่ 90°
+      myServo.write(180);  // ✅ หมุน Servo ไปที่ 90°
     } 
     else if (msg == "off") {
       digitalWrite(LED_PIN, LOW);
