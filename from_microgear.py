@@ -38,7 +38,7 @@ client.loop_start()
 # ------------------------------
 # ⚙️ ตั้งค่า YOLO
 # ------------------------------
-model = YOLO("best.pt")  # โหลดโมเดล YOLO ของคุณ
+model = YOLO("best.pt")
 CONF_THRESHOLD = 0.6
 
 cap = cv2.VideoCapture(0)
@@ -46,7 +46,7 @@ if not cap.isOpened():
     print("❌ ไม่สามารถเปิดกล้องได้")
     exit()
 
-# ตั้งค่ากล้อง (เหมาะสม)
+# ตั้งค่ากล้อง
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FPS, 30)
@@ -68,7 +68,7 @@ while True:
     boxes = results[0].boxes
     annotated_frame = frame
 
-    status = "none"  # ตัวแปรเก็บสถานะ (default)
+    status = "none"  # ตัวแปรเก็บสถานะ
 
     if boxes is not None and len(boxes) > 0:
         confs = boxes.conf
@@ -78,12 +78,13 @@ while True:
             annotated_frame = results[0].plot()
             names = model.names
 
+            # ตรวจวัตถุแต่ละตัว
             for i in indices:
                 cls_id = int(boxes[i].cls[0])
                 conf = float(boxes[i].conf[0])
                 label = names[cls_id]
 
-                # ✅ กำหนด status ตาม label
+                # กำหนด status ตาม label
                 if label == "coco_1.5":
                     status = "on"
                 elif label == "coco_2.0":
@@ -96,20 +97,20 @@ while True:
                 "status": status
             }
 
-            # ส่งข้อมูลขึ้น NETPIE ทุก 5 วินาที
+            # ส่งข้อมูลทุก 5 วินาที
             if time.time() - last_send_time > 5:
                 sum_coconut += 1
-                motor_number1 = 1
-                shadow_data = {"data": data_dict}
-                client.publish("@shadow/data/update", json.dumps(shadow_data))
-                client.publish("@msg/update", f"{motor_number1}")
-                print(f"🌤️ ส่งค่าแบบ Shadow: {json.dumps(shadow_data)}")
-                last_send_time = time.time()
-            else:
-                motor_number1 = 0
-                client.publish("@msg/update", f"{motor_number1}" , f"{status}")
 
-    cv2.imshow("YOLO + NETPIE (@msg)", annotated_frame)
+                # ส่งแบบ Shadow
+                client.publish("@shadow/data/update", json.dumps({"data": data_dict}))
+
+                # ส่งแบบ msg
+                client.publish("@msg/update", json.dumps(data_dict))
+
+                print(f"🌤️ ส่งค่า Shadow + Msg: {json.dumps(data_dict)}")
+                last_send_time = time.time()
+
+    cv2.imshow("YOLO + NETPIE (@msg + @shadow)", annotated_frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         print("🚪 ออกจากโปรแกรม")
