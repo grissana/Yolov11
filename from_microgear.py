@@ -39,7 +39,7 @@ client.loop_start()
 # ⚙️ ตั้งค่า YOLO
 # ------------------------------
 model = YOLO("best.pt")
-CONF_THRESHOLD = 0.4
+CONF_THRESHOLD = 0.6
 
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
