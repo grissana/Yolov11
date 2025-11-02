@@ -39,7 +39,7 @@ client.loop_start()
 # ⚙️ ตั้งค่า YOLO
 # ------------------------------
 model = YOLO("best.pt")
-CONF_THRESHOLD = 0.6
+CONF_THRESHOLD = 0.4
 
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
@@ -106,6 +106,7 @@ while True:
 
                 # ส่งแบบ msg
                 client.publish("@msg/update", json.dumps(data_dict))
+                client.publish("@msg/sw1MCU1", json.dumps(status))
 
                 print(f"🌤️ ส่งค่า Shadow + Msg: {json.dumps(data_dict)}")
                 last_send_time = time.time()
