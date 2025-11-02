@@ -3,6 +3,7 @@
 #include <Adafruit_SSD1306.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <ESP32Servo.h> // ✅ ไลบรารีควบคุม Servo
 
 // ---------------- OLED ----------------
 #define SCREEN_WIDTH 128
@@ -26,8 +27,11 @@ PubSubClient client(espClient);
 
 // ------------------ GPIO ------------------
 #define LED_PIN 13
-#define RELAY_PIN 4
+#define RELAY_PIN 5
 #define SW_PIN 33
+#define SERVO_PIN 14  // ✅ กำหนดขา Servo (ปรับได้ตามต้องการ เช่น D14)
+
+Servo myServo;  // ✅ ประกาศออบเจ็กต์ Servo
 
 int LED1mcu2 = 0;
 int relayState = 0;
@@ -38,7 +42,7 @@ void updateOLED() {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
-  // บรรทัดที่ 1: WiFi (ขนาดเล็ก)
+  // บรรทัดที่ 1: WiFi
   display.setTextSize(1);
   display.setCursor(0, 0);
   display.print("WiFi: ");
@@ -47,24 +51,23 @@ void updateOLED() {
   else
     display.println("Disconnected");
 
-  // บรรทัดที่ 2: NETPIE (ขนาด 1)
+  // บรรทัดที่ 2: NETPIE
   display.setTextSize(1);
   display.setCursor(0, 16);
   display.print("NETPIE: ");
   display.println(netpieConnected ? "Connected" : "Disconnected");
 
-  // บรรทัดที่ 3: LED (ขนาดใหญ่)
+  // บรรทัดที่ 3: Servo
   display.setTextSize(2);
-  display.setCursor(0, 30);
+  display.setCursor(0, 26);
   display.print("Servo:");
-  display.setCursor(80, 30);
+  display.setCursor(80, 26);
   display.println((LED1mcu2 == 1) ? "ON" : "OFF");
 
-  // บรรทัดที่ 4: Relay (ขนาดใหญ่)
-  display.setTextSize(2);
-  display.setCursor(0, 50);
+  // บรรทัดที่ 4: Relay
+  display.setCursor(0, 46);
   display.print("Relay:");
-  display.setCursor(80, 50);
+  display.setCursor(80, 46);
   display.println((relayState == 1) ? "ON" : "OFF");
 
   display.display();
@@ -101,10 +104,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (msg == "on") {
       digitalWrite(LED_PIN, HIGH);
       LED1mcu2 = 1;
-    } else if (msg == "off") {
+      myServo.write(90);  // ✅ หมุน Servo ไปที่ 90°
+    } 
+    else if (msg == "off") {
       digitalWrite(LED_PIN, LOW);
       LED1mcu2 = 0;
+      myServo.write(0);   // ✅ หมุนกลับมาที่ 0°
     }
+
+    // ส่งสถานะ servo กลับไป NETPIE
+    client.publish("@msg/servo_status", (LED1mcu2 == 1) ? "on" : "off");
     updateOLED();
   }
 }
@@ -114,7 +123,11 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
+  // digitalWrite(RELAY_PIN, LOW);
   pinMode(SW_PIN, INPUT_PULLUP);
+
+  myServo.attach(SERVO_PIN);  // ✅ เริ่มต้น Servo
+  myServo.write(0);           // ตั้งค่าเริ่มต้นมุม 0°
 
   // OLED เริ่มต้น
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -147,6 +160,7 @@ void loop() {
   if (!client.connected()) reconnect();
   client.loop();
 
+  // อ่านสวิตช์ (Active LOW)
   static int lastSwitchState = HIGH;
   int switchState = digitalRead(SW_PIN);
   if (switchState == LOW && lastSwitchState == HIGH) {
@@ -156,18 +170,19 @@ void loop() {
     Serial.println(relayState ? "ON" : "OFF");
 
     client.publish("@msg/relay_status", (relayState == 1) ? "on" : "off");
-
     updateOLED();
     delay(300);
   }
   lastSwitchState = switchState;
 
+  // ส่งสถานะ Servo ทุก 1 วินาที
   static unsigned long lastSend = 0;
   if (millis() - lastSend > 1000) {
     client.publish("@msg/status_sw", (LED1mcu2 == 1) ? "on" : "off");
     lastSend = millis();
   }
 
+  // อัปเดตจอทุก ๆ 3 วินาที
   static unsigned long lastUpdate = 0;
   if (millis() - lastUpdate > 3000) {
     updateOLED();
