@@ -25,7 +25,6 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     try:
-        # ถ้า payload เป็น JSON
         data = json.loads(msg.payload.decode())
         print(f"📩 {msg.topic}: {data}")
     except:
@@ -47,6 +46,7 @@ if not cap.isOpened():
     print("❌ ไม่สามารถเปิดกล้องได้")
     exit()
 
+# ตั้งค่ากล้อง (เหมาะสม)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_FPS, 30)
@@ -66,42 +66,48 @@ while True:
 
     results = model(frame, verbose=False)
     boxes = results[0].boxes
-
     annotated_frame = frame
+
+    status = "none"  # ตัวแปรเก็บสถานะ (default)
 
     if boxes is not None and len(boxes) > 0:
         confs = boxes.conf
         indices = [i for i, c in enumerate(confs) if c >= CONF_THRESHOLD]
+
         if len(indices) > 0:
             annotated_frame = results[0].plot()
             names = model.names
 
-            detected_objects = []
             for i in indices:
                 cls_id = int(boxes[i].cls[0])
                 conf = float(boxes[i].conf[0])
-                label = f"{names[cls_id]}"
-                # detected_objects.append({"object": label, "confidence": round(conf * 100, 1)})
+                label = names[cls_id]
+
+                # ✅ กำหนด status ตาม label
+                if label == "coco_1.5":
+                    status = "on"
+                elif label == "coco_2.0":
+                    status = "off"
 
             data_dict = {
                 "coconut": label,
                 "persent": round(conf * 100, 1),
-                "sum": sum_coconut       
+                "sum": sum_coconut,
+                "status": status
             }
+
             # ส่งข้อมูลขึ้น NETPIE ทุก 5 วินาที
             if time.time() - last_send_time > 5:
-                # json_data = {"data": {"detected": detected_objects}}
-                # client.publish("@msg/update", json.dumps(json_data))
-                # client.publish("@msg/update", json.dumps(data_dict))
-                # client.publish("@msg/update", f"{label},{round(conf * 100, 1)}")
-                # print(f"🚀 ส่งข้อมูลแบบ @msg: {json.dumps(json_data)}")
-                # print(f"🚀 ส่งข้อมูลแบบ @msg: {json.dumps(data_dict)}")
-                # ส่งแบบ Shadow
                 sum_coconut += 1
+                motor_number1 = 1
                 shadow_data = {"data": data_dict}
                 client.publish("@shadow/data/update", json.dumps(shadow_data))
+                client.publish("@msg/update", f"{motor_number1}")
                 print(f"🌤️ ส่งค่าแบบ Shadow: {json.dumps(shadow_data)}")
                 last_send_time = time.time()
+            else:
+                motor_number1 = 0
+                client.publish("@msg/update", f"{motor_number1}" , f"{status}")
 
     cv2.imshow("YOLO + NETPIE (@msg)", annotated_frame)
 
